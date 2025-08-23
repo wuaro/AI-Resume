@@ -5,6 +5,7 @@ import { type App } from 'vue';
 export { useResumeStore } from './useResumeStore';
 export { useSettingsStore } from './useSettingsStore';
 export { useTemplateStore } from './useTemplateStore';
+export { useSystemSettingsStore } from './useSystemSettingsStore';
 
 
 const pinia = createPinia();

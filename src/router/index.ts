@@ -28,6 +28,18 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: 'AI简历 - 网站配置' }
   },
   {
+    path: '/settings',
+    name: 'settings',
+    component: () => import('@/views/settings/index.vue'),
+    meta: { title: '设置' }
+  },
+  {
+    path: '/newAIChat',
+    name: 'settings',
+    component: () => import('@/views/settings/index.vue'),
+    meta: { title: '设置' }
+  },
+  {
     path: '/aiDeep',
     name: 'aiDeep',
     component: () => import('@/views/aiDeep/index.vue'),
