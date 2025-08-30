@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { defineProps, computed, ref } from "vue";
-import { sendToQwenAIDialogue } from "../../../api/qwenAPI";
 import { useResumeStore } from "../../../store";
 import type { AIDialogue, DialogueHistory } from "../../../types/aiDialogue";
 import { defineEmits } from "vue";
+import { createChatCompletion } from "@/api/api";
+import { messageHandler } from "@/api/messageHandler";
+import { useSystemSettingsStore } from "@/store/useSystemSettingsStore";
+import { marked } from "marked";
 
 const resumeStore = useResumeStore();
 const personalInfo = computed(() => resumeStore.personalInfo);
@@ -11,7 +14,7 @@ const props = defineProps({
   description: String, // 接收父组件传入的原始描述
   extend: String, // 接收扩展提示信息
 });
-
+const settingStore = useSystemSettingsStore(); // 系统设置
 const emit = defineEmits<{
   update: [content: string];
 }>();
@@ -43,14 +46,22 @@ const handleAiEnhance = async (Prompt: string, isExtend: boolean) => {
   let messages: DialogueHistory = [message];
   AIextent.value = isExtend;
   loading.value = true;
-  AIReply.value = "";
+  AIReply.value = ""; // 初始化时清空旧内容
+
+  messages.push(messageHandler.formatMessage("assistant", ""));
   try {
-    await sendToQwenAIDialogue(messages, (text, isComplete) => {
-      AIReply.value = text;
-      if (isComplete) {
-        loading.value = false;
+    const response = await createChatCompletion(messages);
+    console.log("聊天历史:", messages);
+    await messageHandler.handleResponse(
+      response,
+      settingStore.aiSettings.stream,
+      (content, reasoning_content, tokens, speed) => {
+        AIReply.value = content;
       }
-    });
+    );
+
+    // 流式响应全部完成后关闭加载状态
+    loading.value = false;
   } catch (error) {
     console.error("AI 处理失败:", error);
     AIReply.value = "AI 处理失败，请稍后再试。";
@@ -93,7 +104,8 @@ const handleApply = () => {
       <div class="ai-content">
         <a-spin :spinning="loading">
           <div v-if="AIReply" class="ai-reply">
-            {{ AIReply }}
+            <div v-html="marked(AIReply)"></div>
+            <!-- {{ AIReply }} -->
             <div class="apply-button" v-if="!AIextent">
               <a-button type="link" size="small" @click="handleApply">
                 <template #icon>
