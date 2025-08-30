@@ -22,19 +22,7 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: 'AI简历 - 简历模板' }
   },
   {
-    path: '/setting',
-    name: 'setting',
-    component: () => import('@/views/setting/index.vue'),
-    meta: { title: 'AI简历 - 网站配置' }
-  },
-  {
     path: '/settings',
-    name: 'settings',
-    component: () => import('@/views/settings/index.vue'),
-    meta: { title: '设置' }
-  },
-  {
-    path: '/newAIChat',
     name: 'settings',
     component: () => import('@/views/settings/index.vue'),
     meta: { title: '设置' }

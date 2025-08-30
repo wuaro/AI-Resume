@@ -1,24 +1,24 @@
 <script setup lang="ts">
 import { defineProps, computed, ref } from "vue";
 import { sendToQwenAIDialogue } from "../../../api/qwenAPI";
-import { useResumeStore } from '../../../store';
+import { useResumeStore } from "../../../store";
 import type { AIDialogue, DialogueHistory } from "../../../types/aiDialogue";
 import { defineEmits } from "vue";
 
 const resumeStore = useResumeStore();
 const personalInfo = computed(() => resumeStore.personalInfo);
 const props = defineProps({
-  description: String,
-  extend: String
+  description: String, // 接收父组件传入的原始描述
+  extend: String, // 接收扩展提示信息
 });
 
 const emit = defineEmits<{
-  update: [content: string]
+  update: [content: string];
 }>();
 
-const AIReply = ref("");
-const loading = ref(false);
-const AIextent = ref(false);
+const AIReply = ref(""); // 存储AI生成内容
+const loading = ref(false); // 加载状态
+const AIextent = ref(false); // 区分润色/扩展模式
 
 const showTitle = computed(() => {
   if (!props.description || props.description.length < 5) {
@@ -38,22 +38,19 @@ const handleAiEnhance = async (Prompt: string, isExtend: boolean) => {
   if (!Prompt || Prompt.length < 5) return;
   let message: AIDialogue = {
     role: "user",
-    content: buildPrompt(Prompt)
-  }
-  let messages: DialogueHistory = [message]
+    content: buildPrompt(Prompt),
+  };
+  let messages: DialogueHistory = [message];
   AIextent.value = isExtend;
   loading.value = true;
   AIReply.value = "";
   try {
-    await sendToQwenAIDialogue(
-      messages,
-      (text, isComplete) => {
-        AIReply.value = text;
-        if (isComplete) {
-          loading.value = false;
-        }
+    await sendToQwenAIDialogue(messages, (text, isComplete) => {
+      AIReply.value = text;
+      if (isComplete) {
+        loading.value = false;
       }
-    );
+    });
   } catch (error) {
     console.error("AI 处理失败:", error);
     AIReply.value = "AI 处理失败，请稍后再试。";
@@ -62,23 +59,35 @@ const handleAiEnhance = async (Prompt: string, isExtend: boolean) => {
 };
 const handleApply = () => {
   if (AIReply.value) {
-    emit('update', AIReply.value);
+    emit("update", AIReply.value);
   }
 };
 </script>
 
 <template>
-
-
-  <a-popover :title="showTitle" trigger="click" placement="right" arrowPointAtCenter="true">
+  <a-popover
+    :title="showTitle"
+    trigger="click"
+    placement="right"
+    arrowPointAtCenter="true"
+  >
     <template #content v-if="description && description.length > 4">
       <div class="ai-controls">
-        <a-button type="primary" @click="handleAiEnhance(description, false)" :loading="loading &&
-          !AIextent" :disabled="loading && AIextent">
+        <a-button
+          type="primary"
+          @click="handleAiEnhance(description, false)"
+          :loading="loading && !AIextent"
+          :disabled="loading && AIextent"
+        >
           AI 润色
         </a-button>
-        <a-button type="primary" @click="extend && handleAiEnhance(extend, true)" :loading="loading && AIextent"
-          :disabled="loading && !AIextent">扩展方向</a-button>
+        <a-button
+          type="primary"
+          @click="extend && handleAiEnhance(extend, true)"
+          :loading="loading && AIextent"
+          :disabled="loading && !AIextent"
+          >扩展方向</a-button
+        >
       </div>
 
       <div class="ai-content">
@@ -99,8 +108,6 @@ const handleApply = () => {
     </template>
     <slot />
   </a-popover>
-
-
 </template>
 
 <style scoped>

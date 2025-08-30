@@ -1,20 +1,23 @@
 <script lang="ts" setup>
+// inject 用于在组件中注入由父组件或祖先组件通过 provide 提供的值
+// Ref 是 Vue 中用于创建响应式引用的类型
 import { inject, type Ref } from "vue";
 
-
+// 通过 inject 函数从祖先组件接收岗位JD（"jd"这个数据）的响应式引用
 const jd = inject<Ref<string>>("jd");
-const resumeProject = inject<Ref<string>>("resumeProject");
 </script>
 
 <template>
   <div class="data-input">
     <div class="input-section">
-      <div class="input-header">岗位 JD<span style="font-size: 12px;">（岗位要求）</span></div>
-      <a-textarea v-model:value="jd" placeholder="请输入岗位 JD..." class="custom-textarea" />
-    </div>
-    <div class="input-section" id="input-value">
-      <div class="input-header">经历<span style="font-size: 12px;">（建议一次深挖一段经历即可）</span></div>
-      <a-textarea v-model:value="resumeProject" placeholder="请输入项目/实习/工作经历..." class="custom-textarea" />
+      <div class="input-header">
+        岗位 JD<span style="font-size: 12px">（岗位要求）</span>
+      </div>
+      <a-textarea
+        v-model:value="jd"
+        placeholder="请输入岗位 JD..."
+        class="custom-textarea"
+      />
     </div>
   </div>
 </template>

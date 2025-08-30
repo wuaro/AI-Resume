@@ -1,6 +1,11 @@
 <template>
   <div class="resume-edit">
-    <a-alert message="现已经支持部分区域渲染markdown或HTML语法（如技能、项目等）" show-icon type="info" style="margin-bottom: 10px;" />
+    <a-alert
+      message="现已经支持部分区域渲染markdown或HTML语法（如技能、项目等）"
+      show-icon
+      type="info"
+      style="margin-bottom: 10px"
+    />
     <!-- 个人信息编辑组件 -->
     <personalInfo />
 
@@ -24,13 +29,13 @@
 </template>
 
 <script setup lang="ts">
-import personalInfo from './personalInfo.vue';
-import education from './education.vue';
-import workExperience from './workExperience.vue';
-import skill from './skill.vue';
-import honor from './honor.vue';
-import selfEvaluation from './selfEvaluation.vue';
-import project from './project.vue';  
+import personalInfo from "./personalInfo.vue";
+import education from "./education.vue";
+import workExperience from "./workExperience.vue";
+import skill from "./skill.vue";
+import honor from "./honor.vue";
+import selfEvaluation from "./selfEvaluation.vue";
+import project from "./project.vue";
 </script>
 
 <style scoped>

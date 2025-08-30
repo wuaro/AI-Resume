@@ -1,18 +1,41 @@
 <template>
-
   <div class="setting">
-    <!-- 选择模板 -->
-    <a-select v-model:value="selectedTemplateId" @change="handleTemplateChange" style="width: 150px;">
-      <a-select-option v-for="item in templates" :key="item.id" :value="item.id">
+    <!--
+      模板选择下拉框：
+      - @change中的方法会默认传进来<a-select-option>中的value值
+     -->
+    <a-select
+      v-model:value="selectedTemplateId"
+      @change="handleTemplateChange"
+      style="width: 150px"
+    >
+      <!-- 从templates数组中获取简历模板选项 -->
+      <a-select-option
+        v-for="item in templates"
+        :key="item.id"
+        :value="item.id"
+      >
         {{ item.name }}
       </a-select-option>
     </a-select>
     <!-- 切换主题色 -->
-    <input class="changeColor" type="color" v-model="themeColor"
-      @change="(e) => handleThemeChange((e.target as HTMLInputElement).value)" />
-    <a-button type="primary" @click="exportToPDF" id="export-button">导出PDF</a-button>
+    <!-- 设置type="color"可以让输入框 变成 颜色选择框 -->
+    <input
+      class="changeColor"
+      type="color"
+      v-model="themeColor"
+      @change="(e) => handleThemeChange((e.target as HTMLInputElement).value)"
+    />
+    <a-button type="primary" @click="exportToPDF" id="export-button"
+      >导出PDF</a-button
+    >
   </div>
-  <div class="preview" ref="resumePreview" @mousedown="startDragging" @wheel.prevent="handleZoom">
+  <div
+    class="preview"
+    ref="resumePreview"
+    @mousedown="startDragging"
+    @wheel.prevent="handleZoom"
+  >
     <div class="resume-content" :style="contentStyle">
       <!-- 动态渲染当前选中的模板组件 -->
       <component :is="currentComponent" :colorShades="colorShades" />
@@ -21,34 +44,48 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick, watch, defineAsyncComponent, type ComponentOptions } from "vue";
+import {
+  ref,
+  reactive,
+  computed,
+  onMounted,
+  onBeforeUnmount,
+  nextTick,
+  watch,
+  defineAsyncComponent,
+  type ComponentOptions,
+} from "vue";
 import { getTemplates } from "../../../utils/getTemplates";
 import type { Template } from "../../../types/template";
 // 引入模板存储中的数据和方法
 import { useTemplateStore } from "../../../store";
 import { generateColorShades } from "../../../utils/colorUtils";
 import html2pdf from "html2pdf.js";
-import { createApp } from 'vue';
+import { createApp } from "vue";
 
 // 主题色部分功能
 const templateStore = useTemplateStore();
 const themeColor = computed({
   get: () => templateStore.themeColor,
-  set: (value) => templateStore.themeColor = value,
+  set: (value) => (templateStore.themeColor = value),
 });
 // 生成的色阶对象
 const colorShades = ref(generateColorShades(themeColor.value));
 // 监听 themeColor 变化，自动更新色阶
-watch(themeColor, (newColor) => {
-  colorShades.value = generateColorShades(newColor);
-}, { immediate: true });
+watch(
+  themeColor,
+  (newColor) => {
+    colorShades.value = generateColorShades(newColor);
+  },
+  { immediate: true }
+);
 // 处理主题色变化
 const handleThemeChange = (color: string) => {
   templateStore.themeColor = color;
 };
 // 多模板切换部分功能
 // 动态导入所有模板组件
-const templateModules = import.meta.glob('../../../template/**/index.vue');
+const templateModules = import.meta.glob("../../../template/**/index.vue");
 // 模板列表
 const templates = ref<Template[]>([]);
 // 当前选中的模板 ID
@@ -60,6 +97,7 @@ const currentComponent = ref();
 onMounted(async () => {
   try {
     templates.value = await getTemplates();
+    console.log("获取到的模板列表:", templates.value);
     // 如果 Pinia 中有已选中的模板，则恢复
     if (templateStore.currentTemplate) {
       selectedTemplateId.value = templateStore.currentTemplate.id;
@@ -70,7 +108,7 @@ onMounted(async () => {
     }
     loadCurrentTemplate();
   } catch (error) {
-    console.error('获取模板列表失败:', error);
+    console.error("获取模板列表失败:", error);
   }
 });
 
@@ -81,33 +119,50 @@ watch(selectedTemplateId, (newId) => {
 
 // 处理模板切换
 const handleTemplateChange = (id: string | null) => {
+  // 传进来的id是<a-select-option>中的value值，也就是所选项的value
   if (!id) return;
-  const selectedTemplate = templates.value.find(t => t.id === id);
+  const selectedTemplate = templates.value.find((t) => t.id === id);
   if (selectedTemplate) {
     templateStore.currentTemplate = selectedTemplate;
     loadCurrentTemplate();
   }
 };
 
-// 加载当前选中的模板组件
+/**
+ * 加载当前选中的模板组件
+ */
 const loadCurrentTemplate = () => {
+  // 从模板存储中获取当前选中的模板
   const selectedTemplate = templateStore.currentTemplate;
+
+  // 确保模板存在且包含有效的文件夹路径
   if (selectedTemplate?.folderPath) {
     const folderName = selectedTemplate.folderPath;
+
+    // 路径有效性检查
     if (!folderName) {
-      console.error('模板路径错误:', selectedTemplate.folderPath);
+      console.error("模板路径错误:", selectedTemplate.folderPath);
       return;
     }
+
+    // 构造模板组件路径（基于预设的目录结构）
     const importPath = `../../../template/${folderName}/index.vue`;
+
+    // 从预加载的模板模块中获取对应路径的导入函数
     const importFunc = templateModules[importPath];
+
     if (importFunc) {
-      currentComponent.value = defineAsyncComponent(() => importFunc() as Promise<typeof import('*.vue')['default']>);
+      // 创建异步组件以提高加载性能
+      currentComponent.value = defineAsyncComponent(
+        // 动态导入模板组件文件
+        () => importFunc() as Promise<typeof import("*.vue")["default"]>
+      );
     } else {
+      // 处理模块未找到的情况
       console.error(`未找到路径为 ${importPath} 的组件`);
     }
   }
 };
-
 
 // 导出简历为 PDF
 const exportToPDF = async () => {
@@ -128,7 +183,9 @@ const exportToPDF = async () => {
     const importFunc = templateModules[importPath];
 
     if (importFunc) {
-      const { default: Component } = await importFunc() as { default: ComponentOptions };
+      const { default: Component } = (await importFunc()) as {
+        default: ComponentOptions;
+      };
       const app = createApp(Component, {
         colorShades: colorShades.value,
       });
@@ -143,17 +200,19 @@ const exportToPDF = async () => {
         html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
       };
-      html2pdf().from(content).set(options).save().finally(() => {
-        // 清理临时容器
-        document.body.removeChild(tempContainer);
-      });
+      html2pdf()
+        .from(content)
+        .set(options)
+        .save()
+        .finally(() => {
+          // 清理临时容器
+          document.body.removeChild(tempContainer);
+        });
     } else {
       console.error(`未找到路径为 ${importPath} 的组件`);
     }
-
   }
 };
-
 
 // 简历预览拖拽事件功能
 // 初始化函数，在组件挂载时调用
@@ -166,16 +225,16 @@ const resumePreview = ref<HTMLElement | null>(null);
 
 // 定义拖拽和缩放的状态
 const state = reactive({
-  scale: 0.6,           // 当前缩放比例
-  translateX: 0,      // 当前水平位移
-  translateY: 0,      // 当前垂直位移
-  dragging: false,    // 是否正在拖拽
-  startX: 0,          // 拖拽起始的鼠标X坐标
-  startY: 0,          // 拖拽起始的鼠标Y坐标
-  previewWidth: 0,    // 预览容器宽度
-  previewHeight: 0,   // 预览容器高度
-  contentWidth: 0,    // 内容宽度
-  contentHeight: 0,   // 内容高度
+  scale: 0.6, // 当前缩放比例
+  translateX: 0, // 当前水平位移
+  translateY: 0, // 当前垂直位移
+  dragging: false, // 是否正在拖拽
+  startX: 0, // 拖拽起始的鼠标X坐标
+  startY: 0, // 拖拽起始的鼠标Y坐标
+  previewWidth: 0, // 预览容器宽度
+  previewHeight: 0, // 预览容器高度
+  contentWidth: 0, // 内容宽度
+  contentHeight: 0, // 内容高度
 });
 
 // 初始化预览和内容尺寸
@@ -211,8 +270,10 @@ const handleZoom = (event: WheelEvent) => {
   // 计算鼠标在容器中的位置偏移
   const rect = resumePreview.value?.getBoundingClientRect();
   if (rect) {
-    const offsetX = event.clientX - rect.left - rect.width / 2 - state.translateX;
-    const offsetY = event.clientY - rect.top - rect.height / 2 - state.translateY;
+    const offsetX =
+      event.clientX - rect.left - rect.width / 2 - state.translateX;
+    const offsetY =
+      event.clientY - rect.top - rect.height / 2 - state.translateY;
     // 根据新的缩放比例调整位移，保持缩放中心在鼠标位置
     state.translateX -= (offsetX / oldScale) * (state.scale - oldScale);
     state.translateY -= (offsetY / oldScale) * (state.scale - oldScale);
@@ -229,8 +290,8 @@ const limitTranslation = () => {
   const scaledContentHeight = state.contentHeight * state.scale;
 
   // 计算至少 10% 的内容需要保持可见
-  const minVisibleX = scaledContentWidth * 0.1 / 2;
-  const minVisibleY = scaledContentHeight * 0.1 / 2;
+  const minVisibleX = (scaledContentWidth * 0.1) / 2;
+  const minVisibleY = (scaledContentHeight * 0.1) / 2;
 
   // 计算预览容器的边界
   const previewLeft = -state.previewWidth / 1.2 + minVisibleX;
@@ -239,8 +300,14 @@ const limitTranslation = () => {
   const previewBottom = state.previewHeight / 1.2 - minVisibleY;
 
   // 确保平移不会超过边界
-  state.translateX = Math.min(previewRight, Math.max(state.translateX, previewLeft));
-  state.translateY = Math.min(previewBottom, Math.max(state.translateY, previewTop));
+  state.translateX = Math.min(
+    previewRight,
+    Math.max(state.translateX, previewLeft)
+  );
+  state.translateY = Math.min(
+    previewBottom,
+    Math.max(state.translateY, previewTop)
+  );
 };
 
 // 开始拖拽
@@ -289,8 +356,6 @@ const contentStyle = computed(() => ({
   transition: state.dragging ? "none" : "transform 0.2s ease",
 }));
 
-
-
 // 组件销毁前移除事件监听
 onBeforeUnmount(() => {
   window.removeEventListener("resize", updateBounds);
@@ -299,5 +364,5 @@ onBeforeUnmount(() => {
 
 <style scoped>
 /* 导入外部css */
-@import '../styles/styles.css';
+@import "../styles/styles.css";
 </style>

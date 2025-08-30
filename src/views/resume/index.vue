@@ -1,24 +1,44 @@
-<!-- 父组件代码 -->
+<!-- 简历编辑组件 -->
 <template>
   <div class="resume">
-
     <!-- 左侧简历内容编辑组件 -->
     <div class="left">
       <div class="btn-group">
-        <!-- 预览填充 -->
-        <a-popconfirm title="填充会覆盖当前数据，确定吗？" ok-text="确定" cancel-text="取消" @confirm="resumeStore.autoFillData">
-          <template #icon><question-circle-outlined style="color: red" /></template>
+        <!--
+          预览填充：点击会弹出气泡确认框(popconfirm)
+          1. 点击确认，则执行@@confirm的方法
+          2. 点击取消，则执行@cancel的方法
+         -->
+        <a-popconfirm
+          title="填充会覆盖当前数据，确定吗？"
+          ok-text="确定"
+          cancel-text="取消"
+          @confirm="resumeStore.autoFillData"
+        >
+          <!--  提示信息左侧红色“？”图标  -->
+          <template #icon
+            ><question-circle-outlined style="color: red"
+          /></template>
+          <!--
+            点击这个按钮的目的就是弹出气泡确认框，至于后面的逻辑，交给<a-popconfirm>处理
+            -->
           <a-button type="primary" ghost>
-            <eye-outlined />
+            <RedoOutlined />
             预览填充
           </a-button>
         </a-popconfirm>
 
         <!-- 清空数据 -->
-        <a-popconfirm title="确定要清空当前简历数据吗？" ok-text="清空" cancel-text="取消" @confirm="resumeStore.clearData">
+        <a-popconfirm
+          title="确定要清空当前简历数据吗？"
+          ok-text="清空"
+          cancel-text="取消"
+          @confirm="resumeStore.clearData"
+        >
+          <!--  提示信息左侧红色“！”图标  -->
           <template #icon><warning-outlined style="color: red" /></template>
           <a-button danger>
-            <delete-outlined />
+            <DeleteOutlined />
             清空数据
           </a-button>
         </a-popconfirm>
@@ -30,8 +50,12 @@
         </a-button>
 
         <!-- 导入按钮 -->
-        <a-upload v-model:fileList="fileList" :beforeUpload="handleFileUpload" :showUploadList="false"
-          accept="application/json">
+        <a-upload
+          v-model:fileList="fileList"
+          :beforeUpload="handleFileUpload"
+          :showUploadList="false"
+          accept="application/json"
+        >
           <a-button type="dashed">
             <upload-outlined />
             导入JSON
@@ -39,14 +63,8 @@
         </a-upload>
       </div>
 
+      <!-- 简历编辑组件 -->
       <resumeEdit />
-      <!-- 底部展示github图标 -->
-      <div class="github-link">
-        <a href="https://github.com/weidong-repo/AIResume" target="_blank">
-          <span class="github-star">如果您喜欢这个项目，请给个 Star 吧！</span>
-          <img src="https://img.shields.io/github/stars/weidong-repo/AIResume?style=social" alt="GitHub stars">
-        </a>
-      </div>
     </div>
     <!-- 右侧简历展示组件 -->
     <div class="right">
@@ -56,13 +74,20 @@
 </template>
 
 <script setup lang="ts">
-import resumeEdit from './components/resumeEdit.vue';
-import resumePreview from './components/resumePreview.vue';
+import resumeEdit from "./components/resumeEdit.vue";
+import resumePreview from "./components/resumePreview.vue";
 import { useResumeStore } from "../../store/useResumeStore";
-import { UploadOutlined } from '@ant-design/icons-vue';
+import { UploadOutlined } from "@ant-design/icons-vue";
 import { message } from "ant-design-vue";
 import type { UploadProps } from "ant-design-vue";
-import { ref } from 'vue';
+import { ref } from "vue";
+import {
+  QuestionCircleOutlined,
+  WarningOutlined,
+  DownloadOutlined,
+  DeleteOutlined,
+  RedoOutlined,
+} from "@ant-design/icons-vue"; // 从ant design vue官方图标中引入图标
 const resumeStore = useResumeStore();
 const fileList = ref<UploadProps["fileList"]>([]);
 
@@ -138,6 +163,5 @@ const handleFileUpload = (file: File) => {
   /* 去除a标签默认样式 */
 
   cursor: pointer;
-
 }
 </style>

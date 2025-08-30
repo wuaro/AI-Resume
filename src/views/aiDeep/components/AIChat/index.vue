@@ -1,45 +1,54 @@
 <script setup lang="ts">
-import { ref, nextTick, reactive } from "vue";
-// 导入向 Qwen AI 发送对话请求的 API 函数
-import { sendToQwenAIDialogue } from "../../../api/qwenAPI";
+import { ref, nextTick, reactive, inject, type Ref } from "vue";
 // 导入对话历史和 AI 对话的类型定义
-import type { DialogueHistory, AIDialogue } from "../../../types/aiDialogue";
-// 导入 marked 库，用于将 Markdown 文本转换为 HTML
+import type { DialogueHistory, AIDialogue } from "@/types/aiDialogue";
 import { marked } from "marked";
-// 从 Vue 导入 inject 函数和 Ref 类型，用于依赖注入
-import { inject, type Ref } from "vue";
 import { createChatCompletion } from "@/api/api";
+// 导入消息格式化方法
 import { messageHandler } from "@/api/messageHandler";
+// 系统设置store
 import { useSystemSettingsStore } from "@/store/useSystemSettingsStore";
-import ChatMessage from "@/components/ChatMessage.vue";
+// 简历store
+import { useResumeStore } from "@/store/useResumeStore";
 import thinkingIcon from "@/assets/photo/深度思考.png";
-import { FileOutlined, ArrowDownOutlined } from "@ant-design/icons-vue";
+import { ArrowDownOutlined } from "@ant-design/icons-vue";
+// 导入提示词
+import {
+  RETOUCH_PROMPT,
+  INTERVIEW_PROMPT,
+  AI_ANSWER_PROMPT,
+  getInterviewFirstMessage,
+  getRetouchFirstMessage,
+} from "./prompt.ts";
 
-// 通过依赖注入获取岗位 JD 的响应式引用，若未提供则初始化为空字符串
+// jd:岗位要求
 const jd = inject<Ref<string>>("jd", ref(""));
-// 通过依赖注入获取简历项目的响应式引用，若未提供则初始化为空字符串
-const resumeProject = inject<Ref<string>>("resumeProject", ref(""));
 // 通过依赖注入获取开始引导游览的函数
 const beginTour = inject<() => void>("beginTour");
-// 创建一个响应式引用，用于指向聊天历史记录的 DOM 元素
+// 聊天记录的 DOM 元素的引用
 const chatHistoryRef = ref<HTMLElement>();
-// 创建一个响应式引用，用于表示是否正在加载数据
+// 加载标记
 const isLoading = ref(false);
-// 用户选择是经历扩展还是模拟面试 true 为经历扩展，false 为模拟面试
+// 用户选择是简历润色还是模拟面试 true 为简历润色，false 为模拟面试（后续如果新增第三个功能，则不能再使用boolean类型）
 const userChoose = ref<boolean>();
-// 输入框中的信息
-const message = ref<AIDialogue>({
+// 第一条消息（由于选择简历润色 或 模拟面试 后会默认发送第一条消息，此消息不能展示在输入框内，所以单独设置一个变了来存储）
+const firstMessage = ref<AIDialogue>({
   role: "user",
   content: "",
 });
-const searchText = ref(""); // 搜索框中的文本
+// 输入框中文本
+let searchText = ref("");
 
 // 多轮聊天记录
 const messages = ref<DialogueHistory>([]);
 
-const chatMessages = ref([]); // 用于显示的聊天记录
+const chatMessages = ref<any>([]); // 用于显示的聊天记录
 
 const settingStore = useSystemSettingsStore(); // 系统设置
+const resumeStore = useResumeStore(); // 简历设置
+
+// 用于存储当前轮次的消息
+const currentRoundMessages = ref<DialogueHistory>([]);
 
 // 添加展开/折叠状态控制
 const isReasoningExpanded = ref(true);
@@ -55,36 +64,37 @@ const toggleReasoning = () => {
  */
 
 /**
- * 用户选择经历扩展 或 模拟面试
+ * 用户选择简历润色 或 模拟面试
  * @param {boolean} isExtend - 是否选择经历扩展，true 为经历扩展，false 为模拟面试
  */
 const choose = (isExtend: boolean) => {
   userChoose.value = isExtend;
   // 经历扩展
   if (userChoose.value) {
-    messages.value.push({
+    // 系统提示词
+    chatMessages.value.push({
       role: "system",
-      content:
-        "你是一个AI助手，请根据用户输入的岗位jd以及工作/项目经历进行深度优化，你的身份是一个简历优化师，你可以通过查看我的岗位jd和我的经历不断询问我问题，你是主导者，要主导本次对话，每轮对话都要根据我的简历主动提出问题等我回复你，然后你不断修改简历，然后帮我优化我的简历，如果简历有优化，请使用```resume   ```进行包裹！一行为一条内容",
+      content: RETOUCH_PROMPT,
     });
-    message.value.role = "user";
-    message.value.content = `您好，请读取我的这段项目/工作经历以及岗位jd！${
-      "```resume" + resumeProject.value + " ```"
-    }  ${"```岗位jd" + jd.value + " ```"} `;
-    sendMessage();
+    firstMessage.value.role = "user";
+    firstMessage.value.content = getRetouchFirstMessage(
+      resumeStore.getJSONData(),
+      jd.value
+    );
+    sendChatMessage();
   }
   // 模拟面试
   else {
-    messages.value.push({
+    chatMessages.value.push({
       role: "system",
-      content:
-        "你是一个AI面试官，请根据用户输入的岗位jd以及工作/项目经历进行深度的项目拷打，你可以通过查看我的岗位jd和我的经历不断询问我问题，可以适当沿着项目延申询问或者深挖项目，可以追问我。你是主导者，要主导本次对话，不断向我进行面试提问，尽量一次只提问一个问题，然后用户回复后可以接着追问或者另外从另一个方面进行提问。",
+      content: INTERVIEW_PROMPT,
     });
-    message.value.role = "user";
-    message.value.content = `面试官，您好，请读取我的这段项目/工作经历以及岗位jd！${
-      "```resume" + resumeProject.value + " ```"
-    }  ${"```岗位jd" + jd.value + " ```"} `;
-    sendMessage();
+    firstMessage.value.role = "user";
+    firstMessage.value.content = getInterviewFirstMessage(
+      resumeStore.getJSONData(),
+      jd.value
+    );
+    sendChatMessage();
   }
 };
 
@@ -93,10 +103,13 @@ const choose = (isExtend: boolean) => {
  * @param {string} content - 要格式化的消息内容。
  * @returns {string} 格式化后的 HTML 字符串。
  */
-const formatMessage = (content: string) => {
+const formatMessage = (content: string | undefined) => {
+  if (typeof content !== "string") {
+    return "";
+  }
   // 过滤掉```resume  ```中的内容
-  content = content.replace(/```resume[\s\S]*?```/g, "");
-  content = content.replace(/```岗位jd[\s\S]*?```/g, "");
+  content = content.replace(/```resume简历内容如下：[\s\S]*?```/g, "");
+  content = content.replace(/```岗位jd内容如下：[\s\S]*?```/g, "");
   // 将 Markdown 文本转换为 HTML
   return marked(content);
 };
@@ -109,7 +122,8 @@ const scrollToBottom = async () => {
   await nextTick();
   // 如果 chatHistoryRef 存在，则滚动到其底部
   if (chatHistoryRef.value) {
-    chatHistoryRef.value.scrollTop = chatHistoryRef.value.scrollHeight;
+    chatHistoryRef.value.scrollTop =
+      chatHistoryRef.value.scrollHeight - chatHistoryRef.value.clientHeight;
   }
 };
 
@@ -117,31 +131,39 @@ const scrollToBottom = async () => {
 const end = ref(false);
 
 const sendChatMessage = async () => {
-  if (!searchText.value.trim() || isLoading.value) return;
+  if (
+    (!searchText.value.trim() && firstMessage.value.content === "") ||
+    isLoading.value
+  )
+    return;
 
   try {
     // 设置loading状态
     isLoading.value = true;
-
     // 添加用户消息
-    chatMessages.value.push(
-      messageHandler.formatMessage("user", searchText.value.trim())
-    );
+    if (firstMessage.value.content === "") {
+      chatMessages.value.push(
+        messageHandler.formatMessage("user", searchText.value.trim())
+      );
+      searchText.value = "";
+    } else {
+      chatMessages.value.push(
+        messageHandler.formatMessage("user", firstMessage.value.content.trim())
+      );
+      firstMessage.value.content = "";
+    }
+
     chatMessages.value.push(messageHandler.formatMessage("assistant", "", "")); // 添加空的 reasoning_content
 
     // 获取最后一条消息
     const lastMessage = chatMessages.value[chatMessages.value.length - 1];
     lastMessage.loading = true;
 
-    // 清空输入框
-    searchText.value = "";
-
     // 调用API获取回复
     const messagesForAPI = chatMessages.value.map(({ role, content }) => ({
       role,
       content,
     }));
-    console.log("messagesForAPI", messagesForAPI);
     const response = await createChatCompletion(messagesForAPI);
 
     // 使用封装的响应处理函数
@@ -149,11 +171,18 @@ const sendChatMessage = async () => {
       response,
       settingStore.aiSettings.stream,
       (content, reasoning_content, tokens, speed) => {
+        if (reasoning_content) {
+          isReasoningExpanded.value = true;
+        }
+        if (content) {
+          isReasoningExpanded.value = false;
+        }
         // 添加 reasoning_content 参数
         lastMessage.content = content;
         lastMessage.reasoning_content = reasoning_content; // 更新 reasoning_content
         lastMessage.completion_tokens = tokens;
         lastMessage.speed = speed;
+        scrollToBottom();
       }
     );
   } catch (error) {
@@ -253,11 +282,11 @@ const restart = () => {
         v-if="userChoose === undefined || userChoose === null"
         id="ai-choose-content"
       >
-        <a-button type="primary" @click="choose(true)">经历深挖</a-button>
+        <a-button type="primary" @click="choose(true)">简历润色</a-button>
         <a-button type="primary" @click="choose(false)"> 模拟面试</a-button>
       </a-space>
       <div v-else style="text-align: center">
-        <a-tag color="green">{{ userChoose ? "经历深挖" : "模拟面试" }}</a-tag>
+        <a-tag color="green">{{ userChoose ? "简历润色" : "模拟面试" }}</a-tag>
       </div>
       <div
         v-for="(msg, index) in chatMessages"
@@ -282,23 +311,10 @@ const restart = () => {
           class="reasoning markdown-body"
           v-html="formatMessage(msg.reasoning_content)"
         ></div>
-        <div class="message-content">
+        <div v-if="msg.content" class="message-content">
           <div class="message-text" v-html="formatMessage(msg.content)"></div>
         </div>
       </div>
-
-      <!-- <template> -->
-      <!-- 对话消息列表 -->
-      <!-- <ChatMessage
-          v-for="(message, index) in chatMessages"
-          :key="message.id"
-          :message="message"
-          :is-last-assistant-message="
-            index === messages.length - 1 && message.role === 'assistant'
-          "
-          @regenerate="handleRegenerate"
-        />
-      </template> -->
 
       <!-- 如果用户选择了模拟面试，则显示结束面试，然后获取面试结果 -->
       <div
@@ -376,9 +392,19 @@ const restart = () => {
           发 送
         </a-button>
         <!-- TODO -->
-        <!-- <a-button type="primary" :loading="isLoading" :disabled="(messages.length < 3)">
+        <a-button
+          type="primary"
+          :loading="isLoading"
+          @click="
+            () => {
+              searchText = AI_ANSWER_PROMPT;
+              sendChatMessage();
+            }
+          "
+          :disabled="userChoose === undefined || userChoose === null || end"
+        >
           AI帮答
-        </a-button> -->
+        </a-button>
       </div>
     </div>
   </div>
